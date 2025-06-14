@@ -31,7 +31,9 @@ public:
     void setCost(double c) { cost = c; }
 
     double getEfficiency() const { return energy_efficiency; }
-    void setEfficiency(double e) { energy_efficiency = e; }
+    void setEfficiency(double e) {
+        energy_efficiency = std::min(e, 100.0);
+    }
 
     double getAesthetic() const { return aesthetic_value; }
     void setAesthetic(double a) { aesthetic_value = a; }
@@ -79,49 +81,79 @@ public:
     }
 };
 
-TEST(BuildingTest, Initialization) {
+class InsulationUpgrade : public Improvement {
+    int insulation_level;
+public:
+    InsulationUpgrade(int level) : insulation_level(level) {}
+    void apply(Building &b) override {
+        double boost = std::min(insulation_level * 0.15, 1.0);
+        b.setEfficiency(b.getEfficiency() + boost * 25);
+        b.setCost(b.getCost() + insulation_level * 400);
+    }
+    std::string description() const override {
+        return "Insulation Upgrade with level " + std::to_string(insulation_level);
+    }
+};
+
+class WindowReplacement : public Improvement {
+    int window_count;
+public:
+    WindowReplacement(int count) : window_count(count) {}
+    void apply(Building &b) override {
+        double boost = std::min(window_count * 0.05, 1.0);
+        b.setEfficiency(b.getEfficiency() + boost * 10);
+        b.setAesthetic(b.getAesthetic() + boost * 5);
+        b.setCost(b.getCost() + window_count * 300);
+    }
+    std::string description() const override {
+        return "Window Replacement of " + std::to_string(window_count) + " windows";
+    }
+};
+
+TEST(BuildingTest, FacadeRenovationOnly) {
     std::vector<Improvement *> plan = {
-        new SolarPanels(50),
-        new FacadeRenovation(4)
+        new FacadeRenovation(8)
     };
-
-    Building b(30.0, 100000, 60, 70, plan);
-
-    ASSERT_EQ(b.getHeight(), 30.0);
-    ASSERT_EQ(b.getCost(), 100000);
-    ASSERT_EQ(b.getEfficiency(), 60);
-    ASSERT_EQ(b.getAesthetic(), 70);
-
+    Building b(25.0, 75000, 50, 40, plan);
+    b.renovate();
+    ASSERT_TRUE(b.getAesthetic() > 40);
+    ASSERT_EQ(b.getCost(), 75000 + 8 * 500);
     return true;
 }
 
-TEST(BuildingTest, RenovationEffect) {
+TEST(BuildingTest, MultipleImprovementsCumulative) {
     std::vector<Improvement *> plan = {
-        new SolarPanels(50),
-        new FacadeRenovation(4)
+        new SolarPanels(30),
+        new FacadeRenovation(3),
+        new SolarPanels(20)
     };
-
-    Building b(30.0, 100000, 60, 70, plan);
+    Building b(35.0, 90000, 55, 65, plan);
     b.renovate();
+    ASSERT_TRUE(b.getEfficiency() > 55);
+    ASSERT_TRUE(b.getAesthetic() > 65);
+    ASSERT_TRUE(b.getCost() > 90000);
+    return true;
+}
 
-    ASSERT_TRUE(b.getEfficiency() > 60);
-    ASSERT_TRUE(b.getCost() > 100000);
-    ASSERT_TRUE(b.getAesthetic() > 70);
-
+TEST(BuildingTest, NoImprovementAfterDelete) {
+    std::vector<Improvement *> plan = {
+        new SolarPanels(40),
+        new FacadeRenovation(5)
+    };
+    Building *b = new Building(28.0, 85000, 65, 75, plan);
+    delete b;
+    ASSERT_TRUE(true);
     return true;
 }
 
 TEST(BuildingTest, ZeroImprovementPlan) {
     std::vector<Improvement *> plan;
-
     Building b(40.0, 120000, 75, 85, plan);
     b.renovate();
-
     ASSERT_EQ(b.getHeight(), 40.0);
     ASSERT_EQ(b.getCost(), 120000);
     ASSERT_EQ(b.getEfficiency(), 75);
     ASSERT_EQ(b.getAesthetic(), 85);
-
     return true;
 }
 
@@ -129,20 +161,43 @@ TEST(BuildingTest, EfficiencyCap) {
     std::vector<Improvement *> plan = {
         new SolarPanels(200)
     };
-
     Building b(20.0, 50000, 80, 60, plan);
     b.renovate();
-
     ASSERT_EQ(b.getEfficiency(), 100);
     ASSERT_EQ(b.getCost(), 50000 + 200 * 100);
+    return true;
+}
 
+TEST(BuildingTest, InsulationUpgradeEffect) {
+    std::vector<Improvement *> plan = {
+        new InsulationUpgrade(6)
+    };
+    Building b(22.0, 60000, 60, 55, plan);
+    b.renovate();
+    ASSERT_TRUE(b.getEfficiency() > 60);
+    ASSERT_EQ(b.getCost(), 60000 + 6 * 400);
+    return true;
+}
+
+TEST(BuildingTest, WindowReplacementEffect) {
+    std::vector<Improvement *> plan = {
+        new WindowReplacement(10)
+    };
+    Building b(30.0, 70000, 70, 50, plan);
+    b.renovate();
+    ASSERT_TRUE(b.getEfficiency() > 70);
+    ASSERT_TRUE(b.getAesthetic() > 50);
+    ASSERT_EQ(b.getCost(), 70000 + 10 * 300);
     return true;
 }
 
 int main() {
-    RUN_TEST(BuildingTest, Initialization);
-    RUN_TEST(BuildingTest, RenovationEffect);
+    RUN_TEST(BuildingTest, FacadeRenovationOnly);
+    RUN_TEST(BuildingTest, MultipleImprovementsCumulative);
+    RUN_TEST(BuildingTest, NoImprovementAfterDelete);
     RUN_TEST(BuildingTest, ZeroImprovementPlan);
     RUN_TEST(BuildingTest, EfficiencyCap);
+    RUN_TEST(BuildingTest, InsulationUpgradeEffect);
+    RUN_TEST(BuildingTest, WindowReplacementEffect);
     return 0;
 }
