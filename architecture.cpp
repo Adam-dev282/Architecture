@@ -111,8 +111,38 @@ TEST(BuildingTest, RenovationEffect) {
     return true;
 }
 
+TEST(BuildingTest, ZeroImprovementPlan) {
+    std::vector<Improvement *> plan;
+
+    Building b(40.0, 120000, 75, 85, plan);
+    b.renovate();
+
+    ASSERT_EQ(b.getHeight(), 40.0);
+    ASSERT_EQ(b.getCost(), 120000);
+    ASSERT_EQ(b.getEfficiency(), 75);
+    ASSERT_EQ(b.getAesthetic(), 85);
+
+    return true;
+}
+
+TEST(BuildingTest, EfficiencyCap) {
+    std::vector<Improvement *> plan = {
+        new SolarPanels(200)
+    };
+
+    Building b(20.0, 50000, 80, 60, plan);
+    b.renovate();
+
+    ASSERT_EQ(b.getEfficiency(), 100);
+    ASSERT_EQ(b.getCost(), 50000 + 200 * 100);
+
+    return true;
+}
+
 int main() {
     RUN_TEST(BuildingTest, Initialization);
     RUN_TEST(BuildingTest, RenovationEffect);
+    RUN_TEST(BuildingTest, ZeroImprovementPlan);
+    RUN_TEST(BuildingTest, EfficiencyCap);
     return 0;
 }
